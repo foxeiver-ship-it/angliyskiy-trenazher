@@ -147,8 +147,15 @@ input[type="text"]:disabled,select:disabled{opacity:.85}
 /* памятка по теме: длинный текст, поэтому шире строка и крупнее межстрочный */
 .note{line-height:1.6}
 .note h2{font-size:1.3rem;margin:0 0 10px}
-.note h3{font-size:1.02rem;margin:26px 0 8px;padding-top:14px;border-top:1px solid var(--line-soft)}
-.note h4{font-size:.94rem;margin:18px 0 6px;color:var(--muted)}
+/* цвет заголовка говорит, откуда правило: красный — разобрано по вопросам
+   банка, синий — дописано по программе вступительного испытания */
+.note h3{font-size:1.02rem;margin:26px 0 8px;padding-top:14px;border-top:1px solid var(--line-soft);color:var(--no)}
+.note h4{font-size:.94rem;margin:18px 0 6px;color:var(--no)}
+.note h3.prog,.note h4.prog{color:var(--accent)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.8rem;color:var(--muted);margin-bottom:14px}
+.legend i{font-style:normal;font-weight:600}
+.legend i.bank{color:var(--no)}
+.legend i.prog{color:var(--accent)}
 .note p{margin:0 0 12px}
 .note ul,.note ol{margin:0 0 12px;padding-left:22px}
 .note li{margin-bottom:5px}

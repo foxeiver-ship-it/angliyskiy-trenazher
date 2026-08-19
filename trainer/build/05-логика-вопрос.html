@@ -14,6 +14,7 @@ function рисоватьШапку(){
      S.mode==="exam"?"вариант экзамена":
      S.mode==="mist"?"работа над ошибками":"весь банк");
   $("#qFill").style.width=Math.round(S.i/S.items.length*100)+"%";
+  $("#qNoteBtn").classList.toggle("hidden",!ПАМЯТКИ[q.t]);
   var верных=0, всего=0;
   S.items.forEach(function(id){ if(S.done[id]){ всего++; if(S.ok[id]) верных++; } });
   $("#qScore").textContent=S.instant?(всего?(верных+"/"+всего):""):
@@ -232,6 +233,9 @@ $("#quitBtn").addEventListener("click",function(){
   домой();
 });
 $("#nextBtn").addEventListener("click",шаг);
+$("#qNoteBtn").addEventListener("click",function(){
+  var q=текущий(); if(q) показатьПамятку(q.t,true);
+});
 
 document.addEventListener("keydown",function(e){
   if($("#quiz").classList.contains("hidden")) return;

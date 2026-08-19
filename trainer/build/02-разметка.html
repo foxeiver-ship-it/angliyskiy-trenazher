@@ -26,6 +26,7 @@
     <div class="bar">
       <div class="row gap12">
         <button class="btn sm" id="quitBtn">← Выйти</button>
+        <button class="btn sm" id="qNoteBtn" title="Памятка по теме вопроса">¶ Правило</button>
         <div class="grow small muted" id="qCounter"></div>
         <div class="small num" id="qClock"></div>
         <div class="small num" id="qScore"></div>
@@ -41,4 +42,16 @@
 
   <!-- ИТОГ -->
   <section id="result" class="hidden"></section>
+
+  <!-- ПАМЯТКА ПО ТЕМЕ -->
+  <section id="note" class="hidden">
+    <div class="row gap12" style="margin-bottom:18px">
+      <button class="btn sm" id="noteBack">← Назад</button>
+      <div class="grow small muted" id="noteTitle"></div>
+    </div>
+    <article class="card section note" id="noteBody"></article>
+    <div class="row gap12" style="margin-top:18px">
+      <button class="btn primary grow" id="noteStart">Тренировать эту тему →</button>
+    </div>
+  </section>
 </div>

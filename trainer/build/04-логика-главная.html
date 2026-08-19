@@ -6,7 +6,7 @@
 var S=null;   /* текущая попытка */
 
 function экран(name){
-  ["home","quiz","result"].forEach(function(k){
+  ["home","quiz","result","note"].forEach(function(k){
     var n=document.getElementById(k);
     if(n) n.classList.toggle("hidden",k!==name);
   });
@@ -47,7 +47,10 @@ function рисоватьРежимы(){
   var w=DB.wrong.length;
   list.appendChild(кнопкаРежима("◧","Тренировка по темам",
     "Все вопросы одной темы подряд, проверка и разбор сразу после ответа",
-    false, рисоватьТемы));
+    false, function(){ рисоватьТемы(false); }));
+  list.appendChild(кнопкаРежима("¶","Памятки по темам",
+    "Правила, таблицы и разбор ловушек — читать перед тренировкой",
+    !ПАМЯТКИ_ЕСТЬ, function(){ рисоватьТемы(true); }));
   list.appendChild(кнопкаРежима("№","Вариант экзамена",
     DB.examN+" случайных "+plural(DB.examN,"вопрос","вопроса","вопросов")+" из разных тем, ответы проверяются в конце"+
     (DB.bestOf?(" · лучший результат "+DB.best+" из "+DB.bestOf):""),
@@ -123,19 +126,56 @@ function рисоватьПодвал(){
   foot.appendChild(box);
 }
 
+/* ---------- памятки ---------- */
+var ПАМЯТКИ = window.ПАМЯТКИ || {};
+var ПАМЯТКИ_ЕСТЬ = Object.keys(ПАМЯТКИ).length>0;
+var темаПамятки = null;
+var памяткаИзПопытки = false;   /* открыли посреди вопроса — значит и вернуть надо в вопрос */
+
+function показатьПамятку(n,изПопытки){
+  var body=$("#noteBody"); if(!body) return;
+  темаПамятки=n;
+  памяткаИзПопытки=!!изПопытки;
+  body.innerHTML=ПАМЯТКИ[n]||"<p>Памятка по этой теме пока не написана.</p>";
+  /* широкие таблицы на телефоне должны прокручиваться, а не ломать вёрстку */
+  Array.prototype.forEach.call(body.querySelectorAll("table"),function(t){
+    var box=el("div","scrollx");
+    t.parentNode.insertBefore(box,t); box.appendChild(t);
+  });
+  $("#noteTitle").textContent="Памятка · "+темаИмя(n);
+  var b=$("#noteStart");
+  var есть=вопросыТемы(n).length;
+  b.disabled=!(есть||памяткаИзПопытки);
+  b.textContent=памяткаИзПопытки?"← Вернуться к вопросу":
+    (есть?"Тренировать эту тему →":"Вопросов по теме пока нет");
+  экран("note");
+}
+$("#noteBack").addEventListener("click",function(){
+  if(памяткаИзПопытки&&S){ экран("quiz"); return; }
+  домой(); рисоватьТемы(true);
+});
+$("#noteStart").addEventListener("click",function(){
+  if(памяткаИзПопытки&&S){ экран("quiz"); return; }
+  if(темаПамятки!=null) старт("topic",темаПамятки);
+});
+
 /* ---------- выбор темы ---------- */
-function рисоватьТемы(){
+function рисоватьТемы(читать){
   var p=$("#pick"); if(!p) return;
   p.innerHTML="";
   p.classList.remove("hidden");
-  p.appendChild(el("div","eyebrow","Выберите тему"));
+  p.appendChild(el("div","eyebrow",читать?"Памятка по какой теме нужна":"Выберите тему"));
   var st=el("div","stack gap8"); st.style.marginTop="10px";
   ТЕМЫ.forEach(function(T){
     var qs=вопросыТемы(T.n);
     var s=DB.topicStat[T.n];
-    var d=qs.length+" "+plural(qs.length,"вопрос","вопроса","вопросов")+
-      (s&&s.all?(" · верно "+Math.round(s.ok/s.all*100)+"% из "+s.all+" попыток"):"");
-    st.appendChild(кнопкаРежима(String(T.n+1),T["название"],d,!qs.length,function(){ старт("topic",T.n); }));
+    var d=читать
+      ? "Правила темы, таблицы и разбор ловушек"
+      : qs.length+" "+plural(qs.length,"вопрос","вопроса","вопросов")+
+        (s&&s.all?(" · верно "+Math.round(s.ok/s.all*100)+"% из "+s.all+" попыток"):"");
+    st.appendChild(кнопкаРежима(String(T.n+1),T["название"],d,
+      читать?!ПАМЯТКИ[T.n]:!qs.length,
+      читать?function(){ показатьПамятку(T.n); }:function(){ старт("topic",T.n); }));
   });
   p.appendChild(st);
   var back=el("button","btn sm","← Назад к режимам");

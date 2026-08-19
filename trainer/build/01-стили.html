@@ -144,6 +144,26 @@ input[type="text"]:disabled,select:disabled{opacity:.85}
 .shortbox{display:flex;flex-direction:column;gap:8px}
 .shortbox .hint{font-size:.78rem;color:var(--muted)}
 
+/* памятка по теме: длинный текст, поэтому шире строка и крупнее межстрочный */
+.note{line-height:1.6}
+.note h2{font-size:1.3rem;margin:0 0 10px}
+.note h3{font-size:1.02rem;margin:26px 0 8px;padding-top:14px;border-top:1px solid var(--line-soft)}
+.note h4{font-size:.94rem;margin:18px 0 6px;color:var(--muted)}
+.note p{margin:0 0 12px}
+.note ul,.note ol{margin:0 0 12px;padding-left:22px}
+.note li{margin-bottom:5px}
+.note code{font-family:var(--mono);font-size:.86em;background:var(--line-soft);
+  padding:1px 5px;border-radius:4px}
+.note table{width:100%;border-collapse:collapse;margin:0 0 14px;font-size:.86rem}
+.note th,.note td{border:1px solid var(--line);padding:7px 9px;text-align:left;
+  vertical-align:top}
+.note th{background:var(--line-soft);font-weight:600}
+.note .scrollx{overflow-x:auto}
+@media (max-width:560px){
+  .note table{font-size:.8rem}
+  .note th,.note td{padding:6px 7px}
+}
+
 .mtable{display:flex;flex-direction:column;gap:10px}
 .mrow{display:flex;gap:12px;align-items:center;padding:12px 14px;border:1px solid var(--line);
   border-radius:9px;background:var(--surface)}

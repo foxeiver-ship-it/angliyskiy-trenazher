@@ -5,8 +5,9 @@
   * все *.html из build/ берутся по алфавиту имён (01-стили, 02-разметка,
     03..06 — логика), поэтому порядок предсказуем и новый кусок достаточно
     просто положить рядом с нужным номером;
-  * банк.js вставляется отдельным <script> перед первым куском логики,
-    чтобы window.ТЕМЫ и window.БАНК уже существовали к моменту запуска;
+  * все *.js из build/ вставляются отдельными <script> перед первым куском
+    логики, чтобы window.ТЕМЫ, window.БАНК и window.ПАМЯТКИ уже существовали
+    к моменту запуска;
   * ничего не грузится из сети — результат открывается по file://.
 """
 import io
@@ -33,12 +34,15 @@ def main():
     if not parts:
         sys.exit("в build/ нет кусков *.html")
 
-    bank_path = os.path.join(BUILD, BANK)
-    if not os.path.exists(bank_path):
-        sys.exit("нет файла " + bank_path)
-    bank = read(bank_path)
-    if "</script" in bank.lower():
-        sys.exit("в банке встретился '</script' — файл нельзя вставить инлайн")
+    data_parts = sorted(f for f in os.listdir(BUILD) if f.endswith(".js"))
+    if BANK not in data_parts:
+        sys.exit("нет файла " + os.path.join(BUILD, BANK))
+    data = []
+    for f in data_parts:
+        текст = read(os.path.join(BUILD, f))
+        if "</script" in текст.lower():
+            sys.exit("в " + f + " встретился '</script' — файл нельзя вставить инлайн")
+        data.append(текст)
 
     # первый кусок — <head> (стили и мета), остальные — тело страницы
     head_parts = [f for f in parts if f.startswith("01-")]
@@ -54,13 +58,14 @@ def main():
     out += [read(os.path.join(BUILD, f)) for f in head_parts]
     out += ["</head>", "<body>"]
     out += [read(os.path.join(BUILD, f)) for f in markup]
-    out += ["<script>", bank, "</script>"]
+    for текст in data:
+        out += ["<script>", текст, "</script>"]
     out += [read(os.path.join(BUILD, f)) for f in logic]
     out += ["</body>", "</html>", ""]
 
     io.open(DEST, "w", encoding="utf-8").write("\n".join(out))
     size = os.path.getsize(DEST)
-    print("куски:", ", ".join(head_parts + markup + [BANK] + logic))
+    print("куски:", ", ".join(head_parts + markup + data_parts + logic))
     print("OK", DEST, size, "байт")
 
 

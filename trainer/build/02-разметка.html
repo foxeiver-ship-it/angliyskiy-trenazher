@@ -1,0 +1,44 @@
+<div class="wrap">
+  <div class="top">
+    <div class="mark">En</div>
+    <div class="grow">
+      <div class="eyebrow">Вступительный экзамен в магистратуру</div>
+      <div style="font-family:var(--serif);font-size:1.02rem">Английский язык</div>
+    </div>
+    <button class="iconbtn" id="themeBtn" title="Тема оформления" aria-label="Переключить тему">◐</button>
+  </div>
+
+  <!-- ГЛАВНАЯ -->
+  <section id="home">
+    <h1 style="margin-bottom:6px">Тренажёр по английскому языку</h1>
+    <p class="muted" style="margin:0 0 22px;max-width:62ch" id="homeLead"></p>
+
+    <div id="modes">
+      <div class="eyebrow" style="margin-bottom:10px">Режим</div>
+      <div class="stack gap8" id="modeList"></div>
+      <div id="pick" class="hidden" style="margin-top:16px"></div>
+      <div id="foot"></div>
+    </div>
+  </section>
+
+  <!-- ВОПРОСЫ -->
+  <section id="quiz" class="hidden">
+    <div class="bar">
+      <div class="row gap12">
+        <button class="btn sm" id="quitBtn">← Выйти</button>
+        <div class="grow small muted" id="qCounter"></div>
+        <div class="small num" id="qClock"></div>
+        <div class="small num" id="qScore"></div>
+      </div>
+      <div class="track"><div class="fill" id="qFill" style="width:0%"></div></div>
+    </div>
+    <div id="qBody"></div>
+    <div class="row gap12" style="margin-top:22px">
+      <button class="btn primary grow" id="nextBtn">Ответить</button>
+    </div>
+    <div class="keyhint"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd> выбрать вариант · <kbd>Enter</kbd> ответить и перейти дальше</div>
+  </section>
+
+  <!-- ИТОГ -->
+  <section id="result" class="hidden"></section>
+</div>

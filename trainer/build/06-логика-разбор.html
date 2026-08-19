@@ -1,0 +1,246 @@
+<script>
+/* ============================================================
+   06 — разбор ответа, итоговый экран, запуск приложения
+   ============================================================ */
+
+/* ---------- вердикт + три блока разбора ---------- */
+function показатьРазбор(q,v,box){
+  var ok=S?S.ok[q.id]:верно(q,v);
+  if(ok===undefined) ok=верно(q,v);
+
+  var vd=el("div","verdict "+(ok?"ok":"no"));
+  vd.appendChild(el("span","g",ok?"✓":"✕"));
+  vd.appendChild(el("span",null,ok?"Верно":(ответДан(q,v)?"Неверно":"Ответ не дан")));
+  box.appendChild(vd);
+
+  var brk=el("div","card brk"); brk.id="brkBox";
+
+  /* 1. правильный ответ */
+  var s1=el("section");
+  s1.appendChild(el("h3",null,"Правильный ответ"));
+  s1.appendChild(правильныйОтвет(q));
+  brk.appendChild(s1);
+
+  /* 2. почему так */
+  if(q.e){
+    var s2=el("section");
+    s2.appendChild(el("h3",null,"Почему так"));
+    s2.appendChild(el("div","why",q.e));
+    brk.appendChild(s2);
+  }
+
+  /* 3. почему остальные не подходят — построчно к вариантам */
+  var wl=разборВариантов(q);
+  if(wl){
+    var s3=el("section");
+    s3.appendChild(el("h3",null,"Почему остальные не подходят"));
+    s3.appendChild(wl);
+    brk.appendChild(s3);
+  }
+
+  /* 4. как запомнить */
+  if(q.k){
+    var s4=el("section");
+    s4.appendChild(el("h3",null,"Как запомнить"));
+    var h=el("div","hook");
+    h.appendChild(el("span","g","◆"));
+    h.appendChild(el("span","grow",q.k));
+    s4.appendChild(h);
+    brk.appendChild(s4);
+  }
+
+  box.appendChild(brk);
+  return brk;
+}
+
+function правильныйОтвет(q){
+  var wrap=el("div");
+  if(q.ty==="one"||q.ty==="many"){
+    q.a.forEach(function(idx){
+      var line=el("div","ansline");
+      line.appendChild(el("div","k",LET[idx]||String(idx+1)));
+      line.appendChild(содержимоеВарианта(q,idx,q.o[idx]));
+      wrap.appendChild(line);
+    });
+  } else if(q.ty==="short"){
+    var l=el("div","ansline");
+    l.appendChild(el("div","k","="));
+    l.appendChild(el("div","grow",q.ans));
+    wrap.appendChild(l);
+  } else if(q.ty==="match"){
+    q.pairs.forEach(function(p,j){
+      var l=el("div","ansline");
+      l.appendChild(el("div","k",String(j+1)));
+      l.appendChild(el("div","grow",p.l+" → "+p.r));
+      wrap.appendChild(l);
+    });
+  }
+  return wrap;
+}
+
+function разборВариантов(q){
+  if(!q.w||!q.w.length) return null;
+  var box=el("div"), было=false;
+  q.o.forEach(function(text,idx){
+    var t=q.w[idx];
+    if(!t||q.a.indexOf(idx)>=0) return;
+    было=true;
+    var line=el("div","wline");
+    line.appendChild(el("div","k",LET[idx]||String(idx+1)));
+    var wt=el("div","wt grow");
+    var файл=q.oimg&&q.oimg[idx];
+    if(файл){
+      var im=document.createElement("img");
+      im.className="optimg"; im.src=файл; im.alt="Вариант "+(LET[idx]||idx+1);
+      im.onerror=function(){ this.remove(); };
+      wt.appendChild(im);
+    } else {
+      wt.appendChild(el("b",null,text));
+    }
+    wt.appendChild(document.createTextNode(" — "+t));
+    line.appendChild(wt);
+    box.appendChild(line);
+  });
+  return было?box:null;
+}
+
+/* ---------- итог ---------- */
+function завершить(){
+  if(!S) return;
+  стопЧасы();
+  /* в режиме экзамена ответы проверяются только сейчас */
+  S.items.forEach(function(id){
+    if(S.done[id]) return;
+    var q=ПО_ID[id];
+    if(!S.instant||ответДан(q,S.ans[id])) зачесть(q);
+    else { S.done[id]=true; S.ok[id]=false; статТемы(q.t,false); пометитьОшибку(id); }
+  });
+  var верных=S.items.filter(function(id){ return S.ok[id]; }).length;
+  if(S.mode==="exam"&&(верных>DB.best||DB.bestOf!==S.items.length)){
+    DB.best=(DB.bestOf!==S.items.length)?верных:Math.max(DB.best,верных);
+    DB.bestOf=S.items.length;
+  }
+  var итог={ mode:S.mode, topic:S.topic, items:S.items.slice(), ans:S.ans, ok:S.ok, ok_n:верных, time:прошло() };
+  DB.resume=null; save();
+  рисоватьИтог(итог);
+  S=null;
+  экран("result");
+}
+
+function рисоватьИтог(R){
+  var box=$("#result"); box.innerHTML="";
+  var n=R.items.length, p=Math.round(R.ok_n/n*100);
+
+  var head=el("div","card score");
+  head.appendChild(el("div","eyebrow",R.mode==="topic"?темаИмя(R.topic):
+    R.mode==="exam"?"Вариант экзамена":R.mode==="mist"?"Работа над ошибками":"Весь банк"));
+  var big=el("div","big",R.ok_n+" / "+n); head.appendChild(big);
+  head.appendChild(el("div","muted",p+"% верных · время "+mmss(R.time)));
+  box.appendChild(head);
+
+  /* по темам */
+  var поТемам={};
+  R.items.forEach(function(id){
+    var q=ПО_ID[id], s=поТемам[q.t]||{ok:0,all:0};
+    s.all++; if(R.ok[id])s.ok++; поТемам[q.t]=s;
+  });
+  var ключи=Object.keys(поТемам);
+  if(ключи.length>1){
+    var sec=el("div","card section");
+    sec.appendChild(el("div","eyebrow","Результат по темам"));
+    var sc=el("div","scroll"); sc.style.marginTop="10px";
+    var tb=el("table","tbl"), th=el("thead"), tr=el("tr");
+    ["Тема","Верно","Доля",""].forEach(function(h){ tr.appendChild(el("th",null,h)); });
+    th.appendChild(tr); tb.appendChild(th);
+    var tbody=el("tbody");
+    ключи.map(Number).sort(function(a,b){ return a-b; }).forEach(function(t){
+      var s=поТемам[t], pr=Math.round(s.ok/s.all*100), r=el("tr");
+      r.appendChild(el("td",null,темаИмя(t)));
+      r.appendChild(el("td","n",s.ok+" / "+s.all));
+      r.appendChild(el("td","n",pr+"%"));
+      var td=el("td"), m=el("div","meter"), i=el("i");
+      i.style.width=pr+"%";
+      i.style.background=pr>=70?"var(--ok)":(pr>=45?"var(--warn)":"var(--no)");
+      m.appendChild(i); td.appendChild(m); r.appendChild(td);
+      tbody.appendChild(r);
+    });
+    tb.appendChild(tbody); sc.appendChild(tb); sec.appendChild(sc);
+    box.appendChild(sec);
+  }
+
+  /* разбор вопросов */
+  var список=el("div","card section");
+  список.appendChild(el("div","eyebrow","Разбор вопросов"));
+  var hint=el("div","small muted","Нажмите на вопрос, чтобы раскрыть разбор.");
+  hint.style.margin="4px 0 12px"; список.appendChild(hint);
+  R.items.forEach(function(id,idx){
+    var q=ПО_ID[id], ok=!!R.ok[id];
+    var b=el("button","opt"); b.type="button";
+    b.style.marginTop=idx?"8px":"0";
+    b.dataset.st=ok?"ok":"no";
+    b.appendChild(el("div","k",String(idx+1)));
+    var tx=el("div","grow");
+    tx.appendChild(el("div",null,q.q));
+    tx.appendChild(el("div","tiny muted",(ok?"верно":"ошибка")+" · "+темаИмя(q.t)+" · "+(ТИП_ИМЯ[q.ty]||q.ty)));
+    b.appendChild(tx);
+    var slot=el("div");
+    b.addEventListener("click",function(){
+      if(slot.firstChild){ slot.innerHTML=""; return; }
+      var saved=S; S=null;
+      var tmp=el("div");
+      var было=верно(q,R.ans[id]);
+      var vd=el("div","verdict "+(было?"ok":"no"));
+      vd.appendChild(el("span","g",было?"✓":"✕"));
+      vd.appendChild(el("span",null,ваш(q,R.ans[id])));
+      tmp.appendChild(vd);
+      var brk=el("div","card brk");
+      var s1=el("section"); s1.appendChild(el("h3",null,"Правильный ответ"));
+      s1.appendChild(правильныйОтвет(q)); brk.appendChild(s1);
+      if(q.e){ var s2=el("section"); s2.appendChild(el("h3",null,"Почему так")); s2.appendChild(el("div","why",q.e)); brk.appendChild(s2); }
+      var wl=разборВариантов(q);
+      if(wl){ var s3=el("section"); s3.appendChild(el("h3",null,"Почему остальные не подходят")); s3.appendChild(wl); brk.appendChild(s3); }
+      if(q.k){ var s4=el("section"); s4.appendChild(el("h3",null,"Как запомнить"));
+        var h=el("div","hook"); h.appendChild(el("span","g","◆")); h.appendChild(el("span","grow",q.k)); s4.appendChild(h); brk.appendChild(s4); }
+      tmp.appendChild(brk);
+      slot.appendChild(tmp);
+      S=saved;
+    });
+    var wrapq=el("div"); wrapq.appendChild(b); wrapq.appendChild(slot);
+    список.appendChild(wrapq);
+  });
+  box.appendChild(список);
+
+  /* кнопки */
+  var row=el("div","row gap12 wrapf"); row.style.marginTop="18px";
+  var home=el("button","btn primary grow","На главную");
+  home.addEventListener("click",домой);
+  row.appendChild(home);
+  if(DB.wrong.length){
+    var mist=el("button","btn","Работа над ошибками ("+DB.wrong.length+")");
+    mist.addEventListener("click",function(){ старт("mist"); });
+    row.appendChild(mist);
+  }
+  var again=el("button","btn","Пройти ещё раз");
+  again.addEventListener("click",function(){ старт(R.mode,R.topic); });
+  row.appendChild(again);
+  box.appendChild(row);
+}
+
+function ваш(q,v){
+  if(!ответДан(q,v)) return "Ответ не дан";
+  var ok=верно(q,v);
+  if(q.ty==="one") return (ok?"Верно":"Неверно")+": вы выбрали «"+(q.o[v]||"—")+"»";
+  if(q.ty==="many") return (ok?"Верно":"Неверно")+": вы выбрали "+(v.map(function(i){ return LET[i]||(i+1); }).join(", ")||"—");
+  if(q.ty==="short") return (ok?"Верно":"Неверно")+": вы ввели «"+v+"»";
+  return ok?"Верно":"Неверно";
+}
+
+/* ---------- запуск ---------- */
+(function(){
+  DB.wrong=DB.wrong.filter(function(id){ return !!ПО_ID[id]; });
+  if(DB.resume&&DB.resume.items) DB.resume.items=DB.resume.items.filter(function(id){ return !!ПО_ID[id]; });
+  if(DB.resume&&(!DB.resume.items||!DB.resume.items.length)) DB.resume=null;
+  save();
+  домой();
+})();
+</script>

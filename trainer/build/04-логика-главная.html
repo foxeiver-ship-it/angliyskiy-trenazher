@@ -1,0 +1,202 @@
+<script>
+/* ============================================================
+   04 — главный экран: режимы, выбор темы, продолжение попытки
+   ============================================================ */
+
+var S=null;   /* текущая попытка */
+
+function экран(name){
+  ["home","quiz","result"].forEach(function(k){
+    var n=document.getElementById(k);
+    if(n) n.classList.toggle("hidden",k!==name);
+  });
+  window.scrollTo(0,0);
+}
+
+function домой(){
+  S=null;
+  рисоватьГлавную();
+  экран("home");
+}
+
+function рисоватьГлавную(){
+  var lead=$("#homeLead");
+  if(lead) lead.textContent="В банке "+БАНК.length+" "+plural(БАНК.length,"вопрос","вопроса","вопросов")+
+    " по "+ТЕМЫ.length+" темам. Тренируйтесь по темам с разбором сразу после ответа, "+
+    "прогоняйте вариант экзамена целиком и возвращайтесь к своим ошибкам. "+
+    "Прогресс сохраняется в браузере — вкладку можно закрыть.";
+  рисоватьРежимы();
+  рисоватьПодвал();
+  var p=$("#pick"); if(p){ p.classList.add("hidden"); p.innerHTML=""; }
+}
+
+function кнопкаРежима(icon,title,desc,off,fn){
+  var b=el("button","mode"); b.disabled=!!off;
+  b.appendChild(el("div","mi",icon));
+  var tx=el("div","grow");
+  tx.appendChild(el("b",null,title));
+  tx.appendChild(el("span",null,desc));
+  b.appendChild(tx);
+  if(!off) b.addEventListener("click",fn);
+  return b;
+}
+
+function рисоватьРежимы(){
+  var list=$("#modeList"); if(!list) return;
+  list.innerHTML="";
+  var w=DB.wrong.length;
+  list.appendChild(кнопкаРежима("◧","Тренировка по темам",
+    "Все вопросы одной темы подряд, проверка и разбор сразу после ответа",
+    false, рисоватьТемы));
+  list.appendChild(кнопкаРежима("№","Вариант экзамена",
+    DB.examN+" случайных "+plural(DB.examN,"вопрос","вопроса","вопросов")+" из разных тем, ответы проверяются в конце"+
+    (DB.bestOf?(" · лучший результат "+DB.best+" из "+DB.bestOf):""),
+    БАНК.length===0, function(){ старт("exam"); }));
+  list.appendChild(кнопкаРежима("✕","Работа над ошибками",
+    w?("Накоплено "+w+" "+plural(w,"вопрос","вопроса","вопросов")+" с ошибками — пока не ответите верно, вопрос остаётся в списке")
+     :"Пока пусто — список появится после первых ошибок",
+    !w, function(){ старт("mist"); }));
+  var модуль=БАНК.length;
+  list.appendChild(кнопкаРежима("∞","Весь банк вперемешку",
+    модуль+" "+plural(модуль,"вопрос","вопроса","вопросов")+" в случайном порядке, разбор сразу",
+    !модуль, function(){ старт("all"); }));
+  рисоватьПродолжение();
+}
+
+/* ---------- незаконченная попытка ---------- */
+function рисоватьПродолжение(){
+  var old=document.getElementById("resumeBox"); if(old) old.remove();
+  var R=DB.resume; if(!R||!R.items||!R.items.length) return;
+  var b=el("button","mode"); b.id="resumeBox"; b.style.marginBottom="14px";
+  b.appendChild(el("div","mi","▸"));
+  var tx=el("div","grow");
+  tx.appendChild(el("b",null,"Продолжить: "+имяРежима(R)));
+  tx.appendChild(el("span",null,"Остановились на вопросе "+(R.i+1)+" из "+R.items.length));
+  b.appendChild(tx);
+  b.addEventListener("click",продолжить);
+  var list=$("#modeList");
+  list.parentNode.insertBefore(b,list);
+}
+function имяРежима(R){
+  if(R.mode==="topic") return "тема «"+темаИмя(R.topic)+"»";
+  if(R.mode==="exam") return "вариант экзамена";
+  if(R.mode==="mist") return "работа над ошибками";
+  return "весь банк";
+}
+
+/* ---------- подвал главной: карта готовности ---------- */
+function рисоватьПодвал(){
+  var foot=$("#foot"); if(!foot) return;
+  foot.innerHTML="";
+  var есть=Object.keys(DB.topicStat).length>0;
+  if(!есть) return;
+  var box=el("div","card section"); box.style.marginTop="18px";
+  box.appendChild(el("div","eyebrow","Карта готовности по темам"));
+  var sc=el("div","scroll"); sc.style.marginTop="10px";
+  var tb=el("table","tbl");
+  var tr=el("tr");
+  ["Тема","Верно","Доля",""].forEach(function(h){ tr.appendChild(el("th",null,h)); });
+  var th=el("thead"); th.appendChild(tr); tb.appendChild(th);
+  var body=el("tbody");
+  ТЕМЫ.forEach(function(T){
+    var s=DB.topicStat[T.n]; if(!s||!s.all) return;
+    var p=Math.round(s.ok/s.all*100);
+    var r=el("tr");
+    r.appendChild(el("td",null,T["название"]));
+    r.appendChild(el("td","n",s.ok+" / "+s.all));
+    r.appendChild(el("td","n",p+"%"));
+    var td=el("td"); var m=el("div","meter"); var i=el("i");
+    i.style.width=p+"%";
+    i.style.background=p>=70?"var(--ok)":(p>=45?"var(--warn)":"var(--no)");
+    m.appendChild(i); td.appendChild(m); r.appendChild(td);
+    body.appendChild(r);
+  });
+  tb.appendChild(body); sc.appendChild(tb); box.appendChild(sc);
+  var reset=el("button","btn sm","Сбросить прогресс");
+  reset.style.marginTop="14px";
+  reset.addEventListener("click",function(){
+    if(!confirm("Стереть статистику, список ошибок и незаконченную попытку?")) return;
+    DB={wrong:[],seen:{},topicStat:{},best:0,bestOf:0,resume:null,examN:DB.examN};
+    save(); домой();
+  });
+  box.appendChild(reset);
+  foot.appendChild(box);
+}
+
+/* ---------- выбор темы ---------- */
+function рисоватьТемы(){
+  var p=$("#pick"); if(!p) return;
+  p.innerHTML="";
+  p.classList.remove("hidden");
+  p.appendChild(el("div","eyebrow","Выберите тему"));
+  var st=el("div","stack gap8"); st.style.marginTop="10px";
+  ТЕМЫ.forEach(function(T){
+    var qs=вопросыТемы(T.n);
+    var s=DB.topicStat[T.n];
+    var d=qs.length+" "+plural(qs.length,"вопрос","вопроса","вопросов")+
+      (s&&s.all?(" · верно "+Math.round(s.ok/s.all*100)+"% из "+s.all+" попыток"):"");
+    st.appendChild(кнопкаРежима(String(T.n+1),T["название"],d,!qs.length,function(){ старт("topic",T.n); }));
+  });
+  p.appendChild(st);
+  var back=el("button","btn sm","← Назад к режимам");
+  back.style.marginTop="14px";
+  back.addEventListener("click",function(){ p.classList.add("hidden"); p.innerHTML=""; });
+  p.appendChild(back);
+  p.scrollIntoView({block:"nearest"});
+}
+
+/* ---------- запуск попытки ---------- */
+function старт(mode,topic){
+  var items=[];
+  if(mode==="topic") items=вопросыТемы(topic).map(function(q){ return q.id; });
+  else if(mode==="mist") items=DB.wrong.slice();
+  else if(mode==="all") items=shuffle(БАНК.map(function(q){ return q.id; }));
+  else if(mode==="exam") items=собратьВариант(DB.examN);
+  if(mode==="topic") items=shuffle(items);
+  if(mode==="mist") items=shuffle(items);
+  if(!items.length){ alert("Для этого режима нет вопросов."); return; }
+  S={ mode:mode, topic:(topic==null?null:topic), items:items, i:0,
+      ans:{}, done:{}, ok:{}, instant:(mode!=="exam"), t0:Date.now(), spent:0 };
+  сохранитьПопытку();
+  экран("quiz");
+  рисоватьВопрос();
+}
+
+/* Вариант экзамена: по возможности поровну из каждой темы, порядок случайный */
+function собратьВариант(n){
+  var поТемам={}, взято=[];
+  БАНК.forEach(function(q){ (поТемам[q.t]=поТемам[q.t]||[]).push(q.id); });
+  var ключи=Object.keys(поТемам);
+  ключи.forEach(function(k){ поТемам[k]=shuffle(поТемам[k]); });
+  var круг=0;
+  while(взято.length<n){
+    var добавили=false;
+    for(var i=0;i<ключи.length&&взято.length<n;i++){
+      var arr=поТемам[ключи[i]];
+      if(круг<arr.length){ взято.push(arr[круг]); добавили=true; }
+    }
+    if(!добавили) break;
+    круг++;
+  }
+  return shuffle(взято);
+}
+
+function продолжить(){
+  var R=DB.resume; if(!R) return;
+  R.items=R.items.filter(function(id){ return !!ПО_ID[id]; });
+  if(!R.items.length){ DB.resume=null; save(); домой(); return; }
+  S={ mode:R.mode, topic:R.topic, items:R.items, i:Math.min(R.i,R.items.length-1),
+      ans:R.ans||{}, done:R.done||{}, ok:R.ok||{}, instant:R.mode!=="exam",
+      t0:Date.now(), spent:R.spent||0 };
+  экран("quiz");
+  рисоватьВопрос();
+}
+
+function сохранитьПопытку(){
+  if(!S){ DB.resume=null; save(); return; }
+  DB.resume={ mode:S.mode, topic:S.topic, items:S.items, i:S.i,
+              ans:S.ans, done:S.done, ok:S.ok, spent:прошло() };
+  save();
+}
+function прошло(){ return S?(S.spent+Math.round((Date.now()-S.t0)/1000)):0; }
+</script>

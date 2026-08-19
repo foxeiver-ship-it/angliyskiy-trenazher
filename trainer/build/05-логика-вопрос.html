@@ -1,0 +1,246 @@
+<script>
+/* ============================================================
+   05 — экран вопроса: ввод ответа, проверка, переходы
+   ============================================================ */
+
+function текущий(){ return S?ПО_ID[S.items[S.i]]:null; }
+function проверен(){ var q=текущий(); return !!(q&&S.done[q.id]); }
+
+/* ---------- шапка ---------- */
+function рисоватьШапку(){
+  var q=текущий(); if(!q) return;
+  $("#qCounter").textContent="Вопрос "+(S.i+1)+" из "+S.items.length+" · "+
+    (S.mode==="topic"?темаИмя(S.topic):
+     S.mode==="exam"?"вариант экзамена":
+     S.mode==="mist"?"работа над ошибками":"весь банк");
+  $("#qFill").style.width=Math.round(S.i/S.items.length*100)+"%";
+  var верных=0, всего=0;
+  S.items.forEach(function(id){ if(S.done[id]){ всего++; if(S.ok[id]) верных++; } });
+  $("#qScore").textContent=S.instant?(всего?(верных+"/"+всего):""):
+    ("отвечено "+Object.keys(S.ans).filter(function(id){ return ответДан(ПО_ID[id],S.ans[id]); }).length+"/"+S.items.length);
+}
+var _tick=null;
+function пуститьЧасы(){
+  if(_tick) clearInterval(_tick);
+  var upd=function(){ var c=$("#qClock"); if(c&&S) c.textContent=mmss(прошло()); };
+  upd(); _tick=setInterval(upd,1000);
+}
+function стопЧасы(){ if(_tick){ clearInterval(_tick); _tick=null; } }
+
+/* ---------- тело вопроса ---------- */
+function рисоватьВопрос(){
+  var q=текущий(); if(!q){ завершить(); return; }
+  if(S.ans[q.id]===undefined) S.ans[q.id]=пустойОтвет(q);
+  рисоватьШапку();
+  пуститьЧасы();
+  var body=$("#qBody"); body.innerHTML="";
+
+  var meta=el("div","qmeta");
+  meta.appendChild(el("span","chip acc",ТИП_ИМЯ[q.ty]||q.ty));
+  meta.appendChild(el("span","chip",темаИмя(q.t)));
+  if(DB.wrong.indexOf(q.id)>=0) meta.appendChild(el("span","chip warn","была ошибка"));
+  meta.appendChild(el("span","chip","№ "+q.id));
+  body.appendChild(meta);
+
+  body.appendChild(el("p","qtext",q.q));
+  if(q.img){
+    var im=document.createElement("img");
+    im.className="qimg"; im.src=q.img; im.alt="Иллюстрация к вопросу";
+    im.onerror=function(){ this.remove(); };
+    body.appendChild(im);
+  }
+
+  if(q.ty==="one"||q.ty==="many") body.appendChild(рисоватьВарианты(q));
+  else if(q.ty==="short") body.appendChild(рисоватьКраткий(q));
+  else if(q.ty==="match") body.appendChild(рисоватьСоответствие(q));
+
+  if(S.done[q.id]) показатьРазбор(q,S.ans[q.id],body);
+  обновитьКнопку();
+}
+
+/* У части вопросов варианты — это графики, а текст лишь помечает, что он на картинке */
+function содержимоеВарианта(q,idx,text){
+  var box=el("div","grow");
+  var файл=q.oimg&&q.oimg[idx];
+  if(text) box.appendChild(document.createTextNode(text));
+  if(файл){
+    var im=document.createElement("img");
+    im.className="optimg"; im.src=файл; im.alt="Вариант "+(LET[idx]||idx+1);
+    im.onerror=function(){ this.remove(); };
+    box.appendChild(im);
+  }
+  return box;
+}
+
+function рисоватьВарианты(q){
+  var box=el("div","opts");
+  var готово=!!S.done[q.id];
+  q.o.forEach(function(text,idx){
+    var b=el("button","opt");
+    b.type="button";
+    b.dataset.i=idx;
+    b.appendChild(el("div","k",LET[idx]||String(idx+1)));
+    b.appendChild(содержимоеВарианта(q,idx,text));
+    if(выбран(q,idx)) b.dataset.sel="1";
+    if(готово){
+      b.classList.add("off");
+      var верныйВар=q.a.indexOf(idx)>=0, выбранВар=выбран(q,idx);
+      if(верныйВар&&выбранВар) b.dataset.st="ok";
+      else if(!верныйВар&&выбранВар) b.dataset.st="no";
+      else if(верныйВар) b.dataset.st="miss";
+      delete b.dataset.sel;
+    } else {
+      b.addEventListener("click",function(){ выбрать(q,idx); });
+    }
+    box.appendChild(b);
+  });
+  return box;
+}
+function выбран(q,idx){
+  var v=S.ans[q.id];
+  return q.ty==="one" ? v===idx : (Array.isArray(v)&&v.indexOf(idx)>=0);
+}
+function выбрать(q,idx){
+  if(S.done[q.id]) return;
+  if(q.ty==="one") S.ans[q.id]=(S.ans[q.id]===idx?null:idx);
+  else {
+    var v=(S.ans[q.id]||[]).slice();
+    var p=v.indexOf(idx);
+    if(p>=0) v.splice(p,1); else v.push(idx);
+    v.sort(function(a,b){ return a-b; });
+    S.ans[q.id]=v;
+  }
+  var box=$("#qBody").querySelector(".opts");
+  if(box) Array.prototype.forEach.call(box.querySelectorAll(".opt"),function(b){
+    if(выбран(q,+b.dataset.i)) b.dataset.sel="1"; else delete b.dataset.sel;
+  });
+  обновитьКнопку();
+  сохранитьПопытку();
+}
+
+function рисоватьКраткий(q){
+  var box=el("div","shortbox");
+  var inp=document.createElement("input");
+  inp.type="text"; inp.id="shortInput"; inp.name="shortInput";
+  inp.setAttribute("aria-label","Ваш краткий ответ");
+  inp.setAttribute("autocomplete","off");
+  inp.setAttribute("autocapitalize","off");
+  inp.setAttribute("spellcheck","false");
+  inp.placeholder="Введите ответ";
+  inp.value=S.ans[q.id]||"";
+  if(S.done[q.id]) inp.disabled=true;
+  else {
+    inp.addEventListener("input",function(){ S.ans[q.id]=inp.value; обновитьКнопку(); });
+    inp.addEventListener("change",сохранитьПопытку);
+  }
+  box.appendChild(inp);
+  box.appendChild(el("div","hint","Регистр, ё/е, пробелы и знаки препинания не важны; словоформа тоже засчитывается."));
+  return box;
+}
+
+function рисоватьСоответствие(q){
+  var box=el("div","mtable");
+  var готово=!!S.done[q.id];
+  q.pairs.forEach(function(p,j){
+    var row=el("div","mrow");
+    var l=el("div","ml",(j+1)+". "+p.l);
+    var r=el("div","mr");
+    var sel=document.createElement("select");
+    sel.dataset.j=j;
+    sel.name="m"+q.id+"_"+j;
+    sel.id="m"+q.id+"_"+j;
+    sel.setAttribute("aria-label","Соответствие для строки "+(j+1));
+    var o0=document.createElement("option");
+    o0.value=""; o0.textContent="— выберите —";
+    sel.appendChild(o0);
+    (q.pool||[]).forEach(function(text){
+      var o=document.createElement("option");
+      o.value=text; o.textContent=text;
+      sel.appendChild(o);
+    });
+    var cur=(S.ans[q.id]||{})[j];
+    if(cur) sel.value=cur;
+    if(готово){
+      sel.disabled=true;
+      row.dataset.st=строкаВерна(q,S.ans[q.id],j)?"ok":"no";
+      if(!строкаВерна(q,S.ans[q.id],j)) r.appendChild(el("div","fix","Верно: "+p.r));
+    } else {
+      sel.addEventListener("change",function(){
+        var v=Object.assign({},S.ans[q.id]||{});
+        if(sel.value) v[j]=sel.value; else delete v[j];
+        S.ans[q.id]=v; обновитьКнопку(); сохранитьПопытку();
+      });
+    }
+    r.insertBefore(sel,r.firstChild);
+    row.appendChild(l); row.appendChild(r);
+    box.appendChild(row);
+  });
+  return box;
+}
+
+/* ---------- кнопка снизу ---------- */
+function обновитьКнопку(){
+  var q=текущий(), b=$("#nextBtn"); if(!q||!b) return;
+  var последний=S.i>=S.items.length-1;
+  if(S.instant){
+    if(S.done[q.id]){ b.textContent=последний?"Показать итог":"Дальше →"; b.disabled=false; }
+    else { b.textContent="Ответить"; b.disabled=!ответДан(q,S.ans[q.id]); }
+  } else {
+    b.textContent=последний?"Завершить и проверить":"Дальше →";
+    b.disabled=false;
+  }
+}
+
+function шаг(){
+  var q=текущий(); if(!q) return;
+  if(S.instant&&!S.done[q.id]){
+    if(!ответДан(q,S.ans[q.id])) return;
+    зачесть(q);
+    рисоватьВопрос();
+    var brk=document.getElementById("brkBox");
+    if(brk) brk.scrollIntoView({behavior:"smooth",block:"nearest"});
+    return;
+  }
+  if(S.i>=S.items.length-1){ завершить(); return; }
+  S.i++;
+  сохранитьПопытку();
+  рисоватьВопрос();
+}
+
+function зачесть(q){
+  var ok=верно(q,S.ans[q.id]);
+  S.done[q.id]=true; S.ok[q.id]=ok;
+  DB.seen[q.id]=(DB.seen[q.id]||0)+1;
+  статТемы(q.t,ok);
+  if(ok) снятьОшибку(q.id); else пометитьОшибку(q.id);
+  сохранитьПопытку();
+}
+
+/* ---------- выход и клавиатура ---------- */
+$("#quitBtn").addEventListener("click",function(){
+  if(S) сохранитьПопытку();
+  стопЧасы();
+  домой();
+});
+$("#nextBtn").addEventListener("click",шаг);
+
+document.addEventListener("keydown",function(e){
+  if($("#quiz").classList.contains("hidden")) return;
+  var tag=(e.target.tagName||"").toLowerCase();
+  var поле=(tag==="input"||tag==="select"||tag==="textarea");
+  if(e.key==="Enter"){
+    e.preventDefault();
+    var b=$("#nextBtn"); if(!b.disabled) шаг();
+    return;
+  }
+  if(e.key==="Escape"){ if(S) сохранитьПопытку(); стопЧасы(); домой(); return; }
+  if(поле) return;
+  var q=текущий(); if(!q||S.done[q.id]) return;
+  if(q.ty!=="one"&&q.ty!=="many") return;
+  var n=-1;
+  if(/^[1-9]$/.test(e.key)) n=+e.key-1;
+  var L=LET.indexOf(e.key.toUpperCase());
+  if(L>=0) n=L;
+  if(n>=0&&n<q.o.length){ e.preventDefault(); выбрать(q,n); }
+});
+</script>

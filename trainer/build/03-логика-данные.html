@@ -1,0 +1,125 @@
+<script>
+/* ============================================================
+   03 — данные, хранилище, проверка ответов
+   ============================================================ */
+
+/* ---------- короткие помощники ---------- */
+var $ = function(s){ return document.querySelector(s); };
+function el(t,c,x){ var n=document.createElement(t); if(c)n.className=c; if(x!=null)n.textContent=x; return n; }
+function shuffle(a){ a=a.slice(); for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var v=a[i]; a[i]=a[j]; a[j]=v; } return a; }
+var LET="АБВГДЕЖЗИКЛМН";
+function plural(n,a,b,c){ var m=n%100; if(m>=11&&m<=14)return c; m=n%10; if(m===1)return a; if(m>=2&&m<=4)return b; return c; }
+function mmss(sec){ var m=Math.floor(sec/60), s=sec%60; return m+":"+(s<10?"0":"")+s; }
+
+/* ---------- банк ---------- */
+var ТЕМЫ = window.ТЕМЫ || [];
+var БАНК = window.БАНК || [];
+var ПО_ID = {};
+БАНК.forEach(function(q){ ПО_ID[q.id]=q; });
+function темаИмя(n){ for(var i=0;i<ТЕМЫ.length;i++) if(ТЕМЫ[i].n===n) return ТЕМЫ[i]["название"]; return "Тема "+n; }
+function вопросыТемы(n){ return БАНК.filter(function(q){ return q.t===n; }); }
+var ТИП_ИМЯ={one:"Один ответ",many:"Несколько ответов",short:"Краткий ответ",match:"Соответствие"};
+
+/* ---------- хранилище ---------- */
+var KEY="english_v1";
+var DB={ wrong:[], seen:{}, topicStat:{}, best:0, bestOf:0, resume:null, examN:20 };
+try{ var raw=localStorage.getItem(KEY); if(raw) DB=Object.assign(DB,JSON.parse(raw)); }catch(e){}
+if(!Array.isArray(DB.wrong)) DB.wrong=[];
+if(!DB.seen) DB.seen={};
+if(!DB.topicStat) DB.topicStat={};
+if(!DB.examN) DB.examN=20;
+/* вопросы могли исчезнуть из банка после обновления — чистим хвосты */
+DB.wrong=DB.wrong.filter(function(id){ return !!ПО_ID[id]; });
+function save(){ try{ localStorage.setItem(KEY,JSON.stringify(DB)); }catch(e){} }
+function пометитьОшибку(id){ if(DB.wrong.indexOf(id)<0) DB.wrong.push(id); }
+function снятьОшибку(id){ var i=DB.wrong.indexOf(id); if(i>=0) DB.wrong.splice(i,1); }
+function статТемы(t,ok){
+  var s=DB.topicStat[t]||{ok:0,all:0};
+  s.all++; if(ok)s.ok++;
+  DB.topicStat[t]=s;
+}
+
+/* ---------- нормализация для короткого ответа ---------- */
+function norm(s){
+  return String(s==null?"":s)
+    .toLowerCase()
+    .replace(/ё/g,"е")
+    .replace(/[^0-9a-zа-я\s]/g," ")
+    .replace(/\s+/g," ")
+    .trim();
+}
+/* хвосты, которыми может отличаться словоформа (падеж/род/число) */
+var ОКОНЧАНИЕ=/^(|а|я|у|ю|е|и|ы|о|ой|ей|ый|ий|ое|ее|ые|ие|ая|яя|ую|юю|ым|им|ом|ем|ых|их|ыми|ими|ого|его|ому|ему|ов|ев|ам|ям|ах|ях|ами|ями)$/;
+function словоРавно(x,y){
+  if(x===y) return true;
+  var n=Math.min(x.length,y.length), p=0;
+  while(p<n && x[p]===y[p]) p++;
+  if(x.length<6 || y.length<6) return false;
+  if(p<x.length-3 || p<y.length-3) return false;
+  if(p<4) return false;
+  return ОКОНЧАНИЕ.test(x.slice(p)) && ОКОНЧАНИЕ.test(y.slice(p));
+}
+function мягкоеРавенство(a,b){
+  var na=norm(a), nb=norm(b);
+  if(!na||!nb) return false;
+  if(na===nb) return true;
+  /* «0,25» и «0.25» после чистки пунктуации становятся «0 25» — склеиваем цифры */
+  if(na.replace(/\s/g,"")===nb.replace(/\s/g,"")) return true;
+  var wa=na.split(" "), wb=nb.split(" ");
+  if(wa.length!==wb.length) return false;
+  for(var i=0;i<wa.length;i++) if(!словоРавно(wa[i],wb[i])) return false;
+  return true;
+}
+
+/* ---------- пустой и проверенный ответ ---------- */
+function пустойОтвет(q){
+  if(q.ty==="one") return null;
+  if(q.ty==="many") return [];
+  if(q.ty==="short") return "";
+  return {};                 /* match: индекс строки -> выбранный вариант */
+}
+function ответДан(q,v){
+  if(q.ty==="one") return v!=null;
+  if(q.ty==="many") return Array.isArray(v)&&v.length>0;
+  if(q.ty==="short") return norm(v).length>0;
+  if(q.ty==="match"){
+    if(!v) return false;
+    for(var i=0;i<q.pairs.length;i++) if(!v[i]) return false;
+    return true;
+  }
+  return false;
+}
+/* Проверка строго по СПЕЦИФИКАЦИЯ.md */
+function верно(q,v){
+  if(q.ty==="one") return v!=null && q.a.indexOf(v)>=0;
+  if(q.ty==="many"){
+    if(!Array.isArray(v)) return false;
+    if(v.length!==q.a.length) return false;
+    for(var i=0;i<q.a.length;i++) if(v.indexOf(q.a[i])<0) return false;
+    return true;
+  }
+  if(q.ty==="short") return мягкоеРавенство(v,q.ans);
+  if(q.ty==="match"){
+    if(!v) return false;
+    for(var j=0;j<q.pairs.length;j++) if(v[j]!==q.pairs[j].r) return false;
+    return true;
+  }
+  return false;
+}
+/* верна ли отдельная строка соответствия — для подсветки в разборе */
+function строкаВерна(q,v,j){ return !!v && v[j]===q.pairs[j].r; }
+
+/* ---------- тема оформления ---------- */
+(function(){
+  var b=$("#themeBtn");
+  var st=null; try{ st=localStorage.getItem(KEY+"_theme"); }catch(e){}
+  if(st) document.documentElement.setAttribute("data-theme",st);
+  if(b) b.addEventListener("click",function(){
+    var cur=document.documentElement.getAttribute("data-theme");
+    var dark=cur?cur==="dark":matchMedia("(prefers-color-scheme:dark)").matches;
+    var next=dark?"light":"dark";
+    document.documentElement.setAttribute("data-theme",next);
+    try{ localStorage.setItem(KEY+"_theme",next); }catch(e){}
+  });
+})();
+</script>

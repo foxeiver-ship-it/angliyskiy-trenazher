@@ -12,6 +12,7 @@ from pathlib import Path
 
 КОРЕНЬ = Path(__file__).resolve().parent.parent
 ИСТОЧНИК = Path.home() / "Documents" / "Экзамен-английский" / "база.json"
+ПЕРЕВОДЫ = Path.home() / "Documents" / "Экзамен-английский" / "разбор" / "переводы.json"
 ВЫХОД = КОРЕНЬ / "trainer" / "build" / "банк.js"
 
 ТИПЫ = {"multichoice": "one", "shortanswer": "short", "match": "match", "reading": "one"}
@@ -41,6 +42,8 @@ def разобрать_пары(текст):
 
 def main():
     база = json.loads(ИСТОЧНИК.read_text(encoding="utf-8"))
+    переводы = json.loads(ПЕРЕВОДЫ.read_text(encoding="utf-8"))
+    понятия = переводы["_понятия"]
 
     встречены = {в["тема"] for в in база}
     неизвестные = встречены - set(ПОРЯДОК_ТЕМ)
@@ -51,11 +54,16 @@ def main():
 
     банк = []
     for в in база:
+        пер = переводы[в["id"]]
         вопрос = {
             "id": в["id"],
             "t": номер[в["тема"]],
             "ty": ТИПЫ[в["тип"]],
             "q": в["текст"].strip(),
+            "qru": пер["q"],
+            "oru": [],
+            "pairsru": [],
+            "poolru": {},
             "o": [],
             "a": [],
             "pairs": [],
@@ -71,6 +79,7 @@ def main():
             вопрос["o"] = [х["текст"].strip() for х in в["варианты"]]
             вопрос["a"] = [i for i, х in enumerate(в["варианты"]) if х["верный"]]
             вопрос["w"] = в["w"]
+            вопрос["oru"] = пер["o"]
             вопрос["oimg"] = [None] * len(вопрос["o"])
             if len(вопрос["a"]) > 1 or в.get("несколько_ответов"):
                 вопрос["ty"] = "many"
@@ -79,6 +88,8 @@ def main():
         else:
             вопрос["pairs"] = разобрать_пары(в["ответ"])
             вопрос["pool"] = sorted({о for п in в["пары"] for о in п["варианты"]})
+            вопрос["pairsru"] = пер["d"]
+            вопрос["poolru"] = {о: понятия[о] for о in вопрос["pool"]}
         банк.append(вопрос)
 
     строки = [

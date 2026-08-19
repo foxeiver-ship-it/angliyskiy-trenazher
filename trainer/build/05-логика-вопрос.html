@@ -43,6 +43,8 @@ function рисоватьВопрос(){
   body.appendChild(meta);
 
   body.appendChild(el("p","qtext",q.q));
+  /* у соответствий условие и так по-русски — подстрочник совпал бы с ним слово в слово */
+  if(q.qru&&q.qru!==q.q) body.appendChild(el("p","ru",q.qru));
   if(q.img){
     var im=document.createElement("img");
     im.className="qimg"; im.src=q.img; im.alt="Иллюстрация к вопросу";
@@ -63,6 +65,8 @@ function содержимоеВарианта(q,idx,text){
   var box=el("div","grow");
   var файл=q.oimg&&q.oimg[idx];
   if(text) box.appendChild(document.createTextNode(text));
+  var ru=q.oru&&q.oru[idx];
+  if(ru) box.appendChild(el("div","ru",ru));
   if(файл){
     var im=document.createElement("img");
     im.className="optimg"; im.src=файл; im.alt="Вариант "+(LET[idx]||idx+1);
@@ -144,6 +148,7 @@ function рисоватьСоответствие(q){
   q.pairs.forEach(function(p,j){
     var row=el("div","mrow");
     var l=el("div","ml",(j+1)+". "+p.l);
+    if(q.pairsru&&q.pairsru[j]) l.appendChild(el("div","ru",q.pairsru[j]));
     var r=el("div","mr");
     var sel=document.createElement("select");
     sel.dataset.j=j;
@@ -155,7 +160,8 @@ function рисоватьСоответствие(q){
     sel.appendChild(o0);
     (q.pool||[]).forEach(function(text){
       var o=document.createElement("option");
-      o.value=text; o.textContent=text;
+      var ru=q.poolru&&q.poolru[text];
+      o.value=text; o.textContent=ru?(text+" — "+ru):text;
       sel.appendChild(o);
     });
     var cur=(S.ans[q.id]||{})[j];
@@ -163,7 +169,10 @@ function рисоватьСоответствие(q){
     if(готово){
       sel.disabled=true;
       row.dataset.st=строкаВерна(q,S.ans[q.id],j)?"ok":"no";
-      if(!строкаВерна(q,S.ans[q.id],j)) r.appendChild(el("div","fix","Верно: "+p.r));
+      if(!строкаВерна(q,S.ans[q.id],j)){
+        var ruv=q.poolru&&q.poolru[p.r];
+        r.appendChild(el("div","fix","Верно: "+p.r+(ruv?" — "+ruv:"")));
+      }
     } else {
       sel.addEventListener("change",function(){
         var v=Object.assign({},S.ans[q.id]||{});

@@ -53,7 +53,7 @@ function рисоватьРежимы(){
     !ПАМЯТКИ_ЕСТЬ, function(){ рисоватьТемы(true); }));
   list.appendChild(кнопкаРежима("◆","Демоверсия ФУ 2025",
     ДЕМО.length+" "+plural(ДЕМО.length,"задание","задания","заданий")+" из программы вступительного испытания: "+
-    "лексика, грамматика, соответствия и текст с пропусками — в том же порядке и с официальными ключами",
+    "лексика, грамматика, соответствия и тексты с пропусками; ключи официальные, разбор сразу после ответа",
     ДЕМО.length===0, function(){ старт("demo"); }));
   list.appendChild(кнопкаРежима("№","Вариант экзамена",
     DB.examN+" случайных "+plural(DB.examN,"вопрос","вопроса","вопросов")+" из разных тем, ответы проверяются в конце"+
@@ -202,9 +202,8 @@ function старт(mode,topic){
   if(mode==="topic") items=shuffle(items);
   if(mode==="mist") items=shuffle(items);
   if(!items.length){ alert("Для этого режима нет вопросов."); return; }
-  var сразу=(mode!=="exam"&&mode!=="demo");
   S={ mode:mode, topic:(topic==null?null:topic), items:items, i:0,
-      ans:{}, done:{}, ok:{}, instant:сразу, t0:Date.now(), spent:0 };
+      ans:{}, done:{}, ok:{}, instant:(mode!=="exam"), t0:Date.now(), spent:0 };
   сохранитьПопытку();
   экран("quiz");
   рисоватьВопрос();
@@ -234,7 +233,7 @@ function продолжить(){
   R.items=R.items.filter(function(id){ return !!ПО_ID[id]; });
   if(!R.items.length){ DB.resume=null; save(); домой(); return; }
   S={ mode:R.mode, topic:R.topic, items:R.items, i:Math.min(R.i,R.items.length-1),
-      ans:R.ans||{}, done:R.done||{}, ok:R.ok||{}, instant:(R.mode!=="exam"&&R.mode!=="demo"),
+      ans:R.ans||{}, done:R.done||{}, ok:R.ok||{}, instant:R.mode!=="exam",
       t0:Date.now(), spent:R.spent||0 };
   экран("quiz");
   рисоватьВопрос();

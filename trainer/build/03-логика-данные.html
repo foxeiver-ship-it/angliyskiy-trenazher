@@ -14,11 +14,18 @@ function mmss(sec){ var m=Math.floor(sec/60), s=sec%60; return m+":"+(s<10?"0":"
 /* ---------- банк ---------- */
 var ТЕМЫ = window.ТЕМЫ || [];
 var БАНК = window.БАНК || [];
+/* демоверсия программы вуза живёт отдельно от банка: она не попадает ни в темы,
+   ни в вариант экзамена, ни в «весь банк» — только в свой режим */
+var ДЕМО = window.ДЕМО || [];
 var ПО_ID = {};
 БАНК.forEach(function(q){ ПО_ID[q.id]=q; });
+ДЕМО.forEach(function(q){ ПО_ID[q.id]=q; });
 function темаИмя(n){ for(var i=0;i<ТЕМЫ.length;i++) if(ТЕМЫ[i].n===n) return ТЕМЫ[i]["название"]; return "Тема "+n; }
 function вопросыТемы(n){ return БАНК.filter(function(q){ return q.t===n; }); }
-var ТИП_ИМЯ={one:"Один ответ",many:"Несколько ответов",short:"Краткий ответ",match:"Соответствие"};
+var ТИП_ИМЯ={one:"Один ответ",many:"Несколько ответов",short:"Краткий ответ",
+             match:"Соответствие",gaps:"Текст с пропусками"};
+/* соответствие и текст с пропусками устроены одинаково: строки + общий список */
+function поСтрокам(q){ return q.ty==="match"||q.ty==="gaps"; }
 
 /* ---------- хранилище ---------- */
 var KEY="english_v1";
@@ -76,13 +83,13 @@ function пустойОтвет(q){
   if(q.ty==="one") return null;
   if(q.ty==="many") return [];
   if(q.ty==="short") return "";
-  return {};                 /* match: индекс строки -> выбранный вариант */
+  return {};                 /* match и gaps: индекс строки -> выбранный вариант */
 }
 function ответДан(q,v){
   if(q.ty==="one") return v!=null;
   if(q.ty==="many") return Array.isArray(v)&&v.length>0;
   if(q.ty==="short") return norm(v).length>0;
-  if(q.ty==="match"){
+  if(поСтрокам(q)){
     if(!v) return false;
     for(var i=0;i<q.pairs.length;i++) if(!v[i]) return false;
     return true;
@@ -99,7 +106,7 @@ function верно(q,v){
     return true;
   }
   if(q.ty==="short") return мягкоеРавенство(v,q.ans);
-  if(q.ty==="match"){
+  if(поСтрокам(q)){
     if(!v) return false;
     for(var j=0;j<q.pairs.length;j++) if(v[j]!==q.pairs[j].r) return false;
     return true;

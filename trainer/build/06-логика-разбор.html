@@ -67,7 +67,7 @@ function правильныйОтвет(q){
     l.appendChild(el("div","k","="));
     l.appendChild(el("div","grow",q.ans));
     wrap.appendChild(l);
-  } else if(q.ty==="match"){
+  } else if(поСтрокам(q)){
     q.pairs.forEach(function(p,j){
       var l=el("div","ansline");
       l.appendChild(el("div","k",String(j+1)));
@@ -133,7 +133,8 @@ function рисоватьИтог(R){
 
   var head=el("div","card score");
   head.appendChild(el("div","eyebrow",R.mode==="topic"?темаИмя(R.topic):
-    R.mode==="exam"?"Вариант экзамена":R.mode==="mist"?"Работа над ошибками":"Весь банк"));
+    R.mode==="exam"?"Вариант экзамена":R.mode==="demo"?"Демоверсия ФУ 2025":
+    R.mode==="mist"?"Работа над ошибками":"Весь банк"));
   var big=el("div","big",R.ok_n+" / "+n); head.appendChild(big);
   head.appendChild(el("div","muted",p+"% верных · время "+mmss(R.time)));
   box.appendChild(head);
@@ -180,7 +181,8 @@ function рисоватьИтог(R){
     b.dataset.st=ok?"ok":"no";
     b.appendChild(el("div","k",String(idx+1)));
     var tx=el("div","grow");
-    tx.appendChild(el("div",null,q.q));
+    /* у текстов с пропусками условие на целый экран — в списке нужен только зачин */
+    tx.appendChild(el("div",null,q.q.length>140?q.q.slice(0,140).replace(/\s+\S*$/,"")+"…":q.q));
     tx.appendChild(el("div","tiny muted",(ok?"верно":"ошибка")+" · "+темаИмя(q.t)+" · "+(ТИП_ИМЯ[q.ty]||q.ty)));
     b.appendChild(tx);
     var slot=el("div");

@@ -22,7 +22,7 @@ function домой(){
 function рисоватьГлавную(){
   var lead=$("#homeLead");
   if(lead) lead.textContent="В банке "+БАНК.length+" "+plural(БАНК.length,"вопрос","вопроса","вопросов")+
-    " по "+ТЕМЫ.length+" темам. Тренируйтесь по темам с разбором сразу после ответа, "+
+    " по "+ТЕМЫ.length+" темам плюс демоверсия из программы вуза. Тренируйтесь по темам с разбором сразу после ответа, "+
     "прогоняйте вариант экзамена целиком и возвращайтесь к своим ошибкам. "+
     "Прогресс сохраняется в браузере — вкладку можно закрыть.";
   рисоватьРежимы();
@@ -51,6 +51,10 @@ function рисоватьРежимы(){
   list.appendChild(кнопкаРежима("¶","Памятки по темам",
     "Правила, таблицы и разбор ловушек — читать перед тренировкой",
     !ПАМЯТКИ_ЕСТЬ, function(){ рисоватьТемы(true); }));
+  list.appendChild(кнопкаРежима("◆","Демоверсия ФУ 2025",
+    ДЕМО.length+" "+plural(ДЕМО.length,"задание","задания","заданий")+" из программы вступительного испытания: "+
+    "лексика, грамматика, соответствия и текст с пропусками — в том же порядке и с официальными ключами",
+    ДЕМО.length===0, function(){ старт("demo"); }));
   list.appendChild(кнопкаРежима("№","Вариант экзамена",
     DB.examN+" случайных "+plural(DB.examN,"вопрос","вопроса","вопросов")+" из разных тем, ответы проверяются в конце"+
     (DB.bestOf?(" · лучший результат "+DB.best+" из "+DB.bestOf):""),
@@ -83,6 +87,7 @@ function рисоватьПродолжение(){
 function имяРежима(R){
   if(R.mode==="topic") return "тема «"+темаИмя(R.topic)+"»";
   if(R.mode==="exam") return "вариант экзамена";
+  if(R.mode==="demo") return "демоверсия ФУ 2025";
   if(R.mode==="mist") return "работа над ошибками";
   return "весь банк";
 }
@@ -192,11 +197,14 @@ function старт(mode,topic){
   else if(mode==="mist") items=DB.wrong.slice();
   else if(mode==="all") items=shuffle(БАНК.map(function(q){ return q.id; }));
   else if(mode==="exam") items=собратьВариант(DB.examN);
+  /* демоверсия идёт строго в порядке программы: лексика, грамматика, соответствия, тексты */
+  else if(mode==="demo") items=ДЕМО.map(function(q){ return q.id; });
   if(mode==="topic") items=shuffle(items);
   if(mode==="mist") items=shuffle(items);
   if(!items.length){ alert("Для этого режима нет вопросов."); return; }
+  var сразу=(mode!=="exam"&&mode!=="demo");
   S={ mode:mode, topic:(topic==null?null:topic), items:items, i:0,
-      ans:{}, done:{}, ok:{}, instant:(mode!=="exam"), t0:Date.now(), spent:0 };
+      ans:{}, done:{}, ok:{}, instant:сразу, t0:Date.now(), spent:0 };
   сохранитьПопытку();
   экран("quiz");
   рисоватьВопрос();
@@ -226,7 +234,7 @@ function продолжить(){
   R.items=R.items.filter(function(id){ return !!ПО_ID[id]; });
   if(!R.items.length){ DB.resume=null; save(); домой(); return; }
   S={ mode:R.mode, topic:R.topic, items:R.items, i:Math.min(R.i,R.items.length-1),
-      ans:R.ans||{}, done:R.done||{}, ok:R.ok||{}, instant:R.mode!=="exam",
+      ans:R.ans||{}, done:R.done||{}, ok:R.ok||{}, instant:(R.mode!=="exam"&&R.mode!=="demo"),
       t0:Date.now(), spent:R.spent||0 };
   экран("quiz");
   рисоватьВопрос();

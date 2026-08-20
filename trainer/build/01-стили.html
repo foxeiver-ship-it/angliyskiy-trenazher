@@ -107,6 +107,9 @@ button{font-family:inherit;font-size:1rem}
 .chip.acc{background:var(--accent-soft);color:var(--accent)}
 .chip.warn{background:var(--warn-soft);color:var(--warn)}
 .qtext{font-size:1.06rem;line-height:1.5;margin:0 0 6px}
+/* текст с пропусками читается абзацами — переносы из источника надо сохранить */
+.qtext.pre,p.ru.pre{white-space:pre-wrap}
+.qtext.pre{font-size:1rem;line-height:1.65}
 /* русский подстрочник: тот же текст, но приглушённый, чтобы глаз шёл сначала по английскому */
 .ru{color:var(--muted);line-height:1.45}
 p.ru{font-size:.92rem;margin:0 0 18px}

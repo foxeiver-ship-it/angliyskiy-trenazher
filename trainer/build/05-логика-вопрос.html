@@ -9,10 +9,7 @@ function проверен(){ var q=текущий(); return !!(q&&S.done[q.id]);
 /* ---------- шапка ---------- */
 function рисоватьШапку(){
   var q=текущий(); if(!q) return;
-  $("#qCounter").textContent="Вопрос "+(S.i+1)+" из "+S.items.length+" · "+
-    (S.mode==="topic"?темаИмя(S.topic):
-     S.mode==="exam"?"вариант экзамена":
-     S.mode==="mist"?"работа над ошибками":"весь банк");
+  $("#qCounter").textContent="Вопрос "+(S.i+1)+" из "+S.items.length+" · "+имяРежима(S);
   $("#qFill").style.width=Math.round(S.i/S.items.length*100)+"%";
   $("#qNoteBtn").classList.toggle("hidden",!ПАМЯТКИ[q.t]);
   var верных=0, всего=0;
@@ -39,13 +36,15 @@ function рисоватьВопрос(){
   var meta=el("div","qmeta");
   meta.appendChild(el("span","chip acc",ТИП_ИМЯ[q.ty]||q.ty));
   meta.appendChild(el("span","chip",темаИмя(q.t)));
+  if(q["блок"]) meta.appendChild(el("span","chip",q["блок"]));
   if(DB.wrong.indexOf(q.id)>=0) meta.appendChild(el("span","chip warn","была ошибка"));
   meta.appendChild(el("span","chip","№ "+q.id));
   body.appendChild(meta);
 
-  body.appendChild(el("p","qtext",q.q));
+  /* в текстах с пропусками важны абзацы, поэтому переносы строк сохраняются */
+  body.appendChild(el("p","qtext"+(q.ty==="gaps"?" pre":""),q.q));
   /* у соответствий условие и так по-русски — подстрочник совпал бы с ним слово в слово */
-  if(q.qru&&q.qru!==q.q) body.appendChild(el("p","ru",q.qru));
+  if(q.qru&&q.qru!==q.q) body.appendChild(el("p","ru"+(q.ty==="gaps"?" pre":""),q.qru));
   if(q.img){
     var im=document.createElement("img");
     im.className="qimg"; im.src=q.img; im.alt="Иллюстрация к вопросу";
@@ -55,7 +54,7 @@ function рисоватьВопрос(){
 
   if(q.ty==="one"||q.ty==="many") body.appendChild(рисоватьВарианты(q));
   else if(q.ty==="short") body.appendChild(рисоватьКраткий(q));
-  else if(q.ty==="match") body.appendChild(рисоватьСоответствие(q));
+  else if(поСтрокам(q)) body.appendChild(рисоватьСоответствие(q));
 
   if(S.done[q.id]) показатьРазбор(q,S.ans[q.id],body);
   обновитьКнопку();
@@ -148,7 +147,8 @@ function рисоватьСоответствие(q){
   var готово=!!S.done[q.id];
   q.pairs.forEach(function(p,j){
     var row=el("div","mrow");
-    var l=el("div","ml",(j+1)+". "+p.l);
+    /* в тексте с пропусками слева и так стоит номер пропуска — второй раз не нумеруем */
+    var l=el("div","ml",q.ty==="gaps"?p.l:((j+1)+". "+p.l));
     if(q.pairsru&&q.pairsru[j]) l.appendChild(el("div","ru",q.pairsru[j]));
     var r=el("div","mr");
     var sel=document.createElement("select");
